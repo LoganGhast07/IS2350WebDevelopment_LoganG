@@ -1,7 +1,13 @@
+import { Header, Summary, Experience, Education, Skills } from "./Resume";
+
 function App() {
   return (
     <div className="App">
-      <h1>Hello World! Logan Ghast</h1>
+      <Header />
+      <Summary />
+      <Experience />
+      <Education />
+      <Skills />
     </div>
   );
 }
