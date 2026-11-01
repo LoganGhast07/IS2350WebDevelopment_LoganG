@@ -1,9 +1,9 @@
 export function Header() {
   return (
     <header className="resume-header">
-      <h1>Logan Ghast</h1>
-      <p>Information Systems Student</p>
-      <p>Fort Wayne, IN | (260) 431-8295 | loganghast06@gmail.com</p>
+      <h1>Your Name</h1>
+      <p>Job Title / Tagline</p>
+      <p>email@example.com | (555) 555-5555 | City, State</p>
     </header>
   );
 }
@@ -96,3 +96,4 @@ export function Skills() {
     </section>
   );
 }
+
