@@ -1,96 +1,67 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const bodyParser = require('body-parser');
-const mysql = require('mysql2');
-const app = express();
-app.use(bodyParser.json());
+const mysql = require('mysql2/promise');
 
-const JWT_SECRET = '1600ewashingtonblvdZollner';
-// Sample user database
-const users = [
-  { id: 1, username: 'user1', password: 'password1', role: 'user' }
-];
+const app = express(); // <--- MUST be right here at the top
+app.use(express.json());
 
-let con = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "root_password"
-});
+// Secret key used to sign the JWT
+const JWT_SECRET = 'your_jwt_secret_key';
 
-
-// Login route - generate token
-app.post('/login', (req, res) => {
-  const { username, password } = req.body;
-
-  // Find user
-  const user = users.find(u => u.username === username && u.password === password);
-  con.connect(function (err) {
-    if (err) throw err;
-    console.log("Connected!");
-  });
-
-  if (!user) {
-    return res.status(401).json({ message: 'Invalid credentials' });
-  }
-
-  // Create payload for JWT
-  const payload = {
-    id: user.id,
-    username: user.username,
-    role: user.role
-  };
-
-  // Sign token
-  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
-
-  res.json({ message: 'Login successful', token });
-});
-
-// Middleware for JWT verification
-const authenticateJWT = (req, res, next) => {
-  // Get auth header - The Authorization header is commonly used to send authentication tokens
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader) {
-    return res.status(401).json({ message: 'Authorization header missing' });
-  }
-
-  // Extract token from "Bearer <token>"
-  const token = authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: 'Token missing' });
-  }
-
-  try {
-    // Verify token
-    const decoded = jwt.verify(token, JWT_SECRET);
-
-    // Attach user to request
-    req.user = decoded;
-
-    next();
-  } catch (error) {
-    return res.status(403).json({ message: 'Invalid or expired token' });
-  }
+// Database configuration
+const dbConfig = {
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'db_user',
+  password: process.env.DB_PASSWORD || 'user_password',
+  database: process.env.DB_NAME || 'my_database',
+  port: process.env.DB_PORT || 3307
 };
 
-// Protected route
-app.get('/profile', authenticateJWT, (req, res) => {
-  res.json({ message: 'Profile accessed', user: req.user });
-});
+// Login Endpoint
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
 
-// Role-based route
-app.get('/admin', authenticateJWT, (req, res) => {
-  // Check if user has admin role
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ message: 'Access denied: admin role required' });
+  if (!username || !password) {
+    return res.status(400).json({ message: 'Username and password are required' });
   }
 
-  res.json({ message: 'Admin panel accessed' });
+  let connection;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+    const [rows] = await connection.execute(
+      'SELECT * FROM users WHERE username = ? AND password = ?',
+      [username, password]
+    );
+
+    if (rows.length === 0) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const user = rows[0];
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username },
+      JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    return res.json({
+      message: 'Login successful',
+      token: token
+    });
+
+  } catch (err) {
+    console.error('Database query error:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
 });
 
-// Start server
-app.listen(8080, () => {
-  console.log('Server running on port 8080');
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
 });
